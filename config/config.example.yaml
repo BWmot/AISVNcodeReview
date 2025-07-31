@@ -1,0 +1,81 @@
+# SVN配置
+svn:
+  repository_url: "https://your-svn-server/svn/project"
+  username: "svn_username"
+  password: "svn_password"
+  check_interval: 300  # 检查间隔（秒）
+  monitored_paths:
+    - "/trunk/src"
+    - "/branches/dev"
+
+# 监控模式配置
+monitor:
+  enhanced_mode: false  # 是否使用增强模式（支持webhook和更好的状态管理）
+  webhook_port: 8080    # webhook服务器端口
+  webhook_path: "/svn-hook"  # webhook接收路径
+  enable_polling: true  # 是否同时启用轮询检查
+  polling_interval: 300  # 轮询间隔（秒）
+
+# AI API配置
+ai:
+  api_base: "https://api.openai.com/v1"  # OpenAI兼容的API基础URL
+  api_key: "your_openai_api_key"
+  model: "gpt-3.5-turbo"
+  max_tokens: 2000
+  temperature: 0.3
+  system_prompt: |
+    你是一个专业的代码审查助手。请分析以下代码变更，并提供建设性的审查意见。
+    重点关注：
+    1. 代码质量和最佳实践
+    2. 潜在的bug和安全问题
+    3. 性能优化建议
+    4. 代码可读性和维护性
+    请提供简洁明了的中文反馈。
+
+# 钉钉机器人配置
+dingtalk:
+  webhook_url: "https://oapi.dingtalk.com/robot/send?access_token=your_token"
+  secret: "your_dingtalk_secret"  # 可选，用于签名验证
+  at_all: false  # 是否@所有人
+  
+# 用户映射配置文件路径
+user_mapping_file: "config/user_mapping.yaml"
+
+# 日志配置
+logging:
+  level: "INFO"
+  file: "logs/code_review.log"
+  max_size_mb: 10
+  backup_count: 5
+
+# 数据存储
+data:
+  processed_commits_file: "data/processed_commits.json"  # 传统模式使用
+  commit_tracker_db: "data/commit_tracker.db"  # 增强模式使用
+  cache_dir: "data/cache"
+
+# 批量审查配置
+batch_review:
+  # 报告输出配置
+  reports_dir: "reports"  # 报告输出目录
+  report_format: "html"   # 报告格式: html, markdown, json
+  include_code_diff: true  # 是否在报告中包含代码差异
+  max_diff_lines: 500     # 单个文件差异最大显示行数
+  
+  # 审查范围配置
+  default_paths:
+    - "/trunk/src"
+    - "/branches/dev"
+  
+  # AI审查配置（批量模式专用）
+  ai_settings:
+    batch_size: 5        # 批量处理提交数量
+    delay_between_batches: 2  # 批次间延迟（秒）
+    max_retries: 3       # API调用失败重试次数
+    
+  # 报告内容配置
+  report_sections:
+    summary: true        # 包含审查总结
+    statistics: true     # 包含统计信息
+    recommendations: true # 包含改进建议
+    detailed_reviews: true # 包含详细审查内容

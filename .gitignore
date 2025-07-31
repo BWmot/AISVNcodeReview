@@ -1,0 +1,266 @@
+# AI SVN Code Review Tool - Git Ignore File
+
+# =================================
+# Python相关
+# =================================
+# 字节码缓存
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C扩展
+*.so
+
+# 分发/打包
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# 单元测试/覆盖率报告
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath
+*.sage.py
+
+# 环境变量
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder IDE
+.spyderproject
+.spyproject
+
+# Rope项目设置
+.ropeproject
+
+# mkdocs文档
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre类型检查器
+.pyre/
+
+# =================================
+# 项目特定文件
+# =================================
+
+# 配置文件（包含敏感信息）
+config/config.yaml
+config/user_mapping.yaml
+
+# 本地备份文件（不提交到仓库）
+config/*.local.yaml
+config/*.local.yml
+data/*.local.json
+data/*.local.txt
+
+# 数据文件和缓存
+data/processed_commits.json
+data/commit_tracking.json
+data/cache/
+data/*.backup
+data/*.old
+data/*.tmp
+
+# 日志文件
+logs/
+*.log
+
+# 临时文件和调试文件
+*.tmp
+*.temp
+debug_*.py
+test_*.py
+*_debug.py
+*_test.py
+
+# 清理和诊断脚本生成的文件
+cleanup.py
+diagnose.py
+migrate_data.py
+
+# SVN测试目录
+svnTest/
+svnTestwc/
+
+# =================================
+# 系统和编辑器文件
+# =================================
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# =================================
+# 部署和服务相关
+# =================================
+
+# 服务安装文件
+*.exe
+*.msi
+service_install.bat
+service_uninstall.bat
+
+# 证书和密钥文件
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+
+# =================================
+# 文档和报告（临时生成的）
+# =================================
+CLEANUP_REPORT.md
+
+# =================================
+# 网络和缓存
+# =================================
+.requests-cache
+.cache/
+
+# =================================
+# IDE和工具配置
+# =================================
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+
+# =================================
+# 其他
+# =================================
+# 备份文件
+*.bak
+*.backup
+*.orig
+
+# 压缩文件
+*.zip
+*.rar
+*.7z
+*.tar.gz
+*.tgz

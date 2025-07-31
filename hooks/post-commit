@@ -1,0 +1,94 @@
+#!/bin/bash
+#
+# SVN Post-Commit Hook Script
+# 在SVN提交后自动触发AI代码审查
+#
+# 使用方法：
+# 1. 将此脚本复制到SVN仓库的hooks目录下，命名为post-commit
+# 2. 给脚本执行权限：chmod +x post-commit
+# 3. 配置REVIEW_TOOL_HOST和REVIEW_TOOL_PORT变量
+#
+
+REPOS="$1"
+REV="$2"
+
+# 配置审查工具的地址
+REVIEW_TOOL_HOST="localhost"
+REVIEW_TOOL_PORT="8080"
+
+# 日志文件
+LOG_FILE="/var/log/svn-review-hook.log"
+
+# 记录日志函数
+log_message() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+}
+
+# 获取提交信息
+get_commit_info() {
+    local repos="$1"
+    local rev="$2"
+    
+    # 获取作者
+    AUTHOR=$(svnlook author -r "$rev" "$repos")
+    
+    # 获取提交消息
+    MESSAGE=$(svnlook log -r "$rev" "$repos")
+    
+    # 获取变更文件
+    CHANGED_FILES=$(svnlook changed -r "$rev" "$repos")
+    
+    log_message "提交信息: 版本=$rev, 作者=$AUTHOR"
+}
+
+# 发送webhook通知
+send_webhook() {
+    local rev="$1"
+    local author="$2"
+    local message="$3"
+    
+    # 构造JSON数据
+    JSON_DATA=$(cat <<EOF
+{
+    "revision": "$rev",
+    "author": "$author",
+    "message": "$message",
+    "repository": "$REPOS",
+    "timestamp": "$(date -Iseconds)"
+}
+EOF
+)
+    
+    # 发送POST请求
+    curl -X POST \
+         -H "Content-Type: application/json" \
+         -d "$JSON_DATA" \
+         "http://$REVIEW_TOOL_HOST:$REVIEW_TOOL_PORT/svn-hook" \
+         --connect-timeout 10 \
+         --max-time 30 \
+         >> "$LOG_FILE" 2>&1
+    
+    if [ $? -eq 0 ]; then
+        log_message "Webhook发送成功: 版本 $rev"
+    else
+        log_message "Webhook发送失败: 版本 $rev"
+    fi
+}
+
+# 主逻辑
+main() {
+    log_message "SVN Post-Commit Hook 开始: $REPOS, 版本 $REV"
+    
+    # 获取提交信息
+    get_commit_info "$REPOS" "$REV"
+    
+    # 发送webhook通知
+    send_webhook "$REV" "$AUTHOR" "$MESSAGE"
+    
+    log_message "SVN Post-Commit Hook 完成: 版本 $REV"
+}
+
+# 执行主逻辑（后台运行，避免阻塞SVN提交）
+main &
+
+exit 0

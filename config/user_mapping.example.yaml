@@ -1,0 +1,37 @@
+# SVN用户名到钉钉用户ID的映射
+# 格式：svn_username: dingtalk_mobile_or_userid
+user_mapping:
+  "your_svn_username": "your_phone_number"  # 您的手机号，例如：13800138000
+  "john.doe": "13800138001"  # 示例：手机号
+  "jane.smith": "@13800138002"  # 示例：也可以用@+手机号
+  "developer1": "user_id_example"  # 示例：钉钉用户ID
+  "developer2": "13800138003"  # 示例：手机号
+
+# 默认用户（当找不到映射时通知的人）
+default_reviewer:
+  - "your_svn_username"
+  - "your_phone_number"
+
+# 特殊路径的审查者映射
+path_reviewers:
+  "/trunk/src/frontend": 
+    - "frontend.lead"
+    - "ui.developer"
+  "/trunk/src/backend":
+    - "backend.lead"
+    - "api.developer"
+  "/trunk/docs":
+    - "tech.writer"
+    - "project.manager"
+
+# 团队通知配置
+team_notifications:
+  # 重要文件变更时通知整个团队
+  important_files:
+    - "*/config/*"
+    - "*/database/*"
+    - "*/security/*"
+  # 关键分支变更通知
+  critical_branches:
+    - "/trunk"
+    - "/branches/release/*"
