@@ -18,6 +18,7 @@ sys.path.insert(0, src_path)
 try:
     from config_manager import ConfigManager
     from ai_reviewer import AIReviewer
+    from svn_monitor import SVNCommit
     import xml.etree.ElementTree as ET
 except ImportError as e:
     print(f"导入错误: {e}")
@@ -30,8 +31,8 @@ class SimpleBatchReviewer:
     
     def __init__(self, config_path="config/config.yaml"):
         self.config_manager = ConfigManager(config_path)
-        self.config = self.config_manager.get_config()
-        self.ai_reviewer = AIReviewer(config_path)
+        self.config = self.config_manager.config
+        self.ai_reviewer = AIReviewer()
         
         # 创建报告目录
         self.reports_dir = "reports"
@@ -101,11 +102,19 @@ class SimpleBatchReviewer:
                 author_elem = logentry.find('author')
                 author = author_elem.text if author_elem is not None else 'unknown'
                 
+                # 过滤Jenkins提交
+                if author.lower() in ['jenkins', 'jenkins-ci', 'ci', 'build']:
+                    continue
+                
                 date_elem = logentry.find('date')
                 date_str = date_elem.text if date_elem is not None else ''
                 
                 msg_elem = logentry.find('msg')
                 message = msg_elem.text if msg_elem is not None else ''
+                
+                # 过滤自动构建相关的提交信息
+                if any(keyword in message.lower() for keyword in ['auto build', 'jenkins', 'ci build', '[bot]']):
+                    continue
                 
                 commit_info = {
                     'revision': revision,
@@ -163,13 +172,19 @@ class SimpleBatchReviewer:
                 # 获取代码差异
                 diff_content = self.get_commit_diff(revision)
                 
-                # AI审查
-                review_result = self.ai_reviewer.review_code(
-                    commit['author'],
-                    commit['message'],
-                    diff_content,
-                    revision
+                # 创建SVNCommit对象
+                commit_date = datetime.fromisoformat(commit['date'].replace('Z', '+00:00')) if commit['date'] else datetime.now()
+                svn_commit = SVNCommit(
+                    revision=commit['revision'],
+                    author=commit['author'],
+                    date=commit_date,
+                    message=commit['message'],
+                    changed_files=[],  # 简化版暂时不获取详细文件信息
+                    diff_content=diff_content
                 )
+                
+                # AI审查
+                review_result = self.ai_reviewer.review_commit(svn_commit)
                 
                 result = {
                     'commit': commit,
@@ -271,21 +286,32 @@ class SimpleBatchReviewer:
                 html_content += f"""
         <div class="review">
             <h4>🤖 AI审查结果</h4>
-            <p><strong>总结:</strong> {review.get('summary', '无')}</p>
-            <p><strong>问题:</strong></p>
+            <p><strong>总结:</strong> {review.summary if review.summary else '无'}</p>
+            <p><strong>评分:</strong> {review.overall_score}/10</p>
+            <p><strong>风险问题:</strong></p>
             <ul>
 """
-                for issue in review.get('issues', []):
-                    html_content += f"<li>{issue}</li>"
+                for risk in review.risks:
+                    html_content += f"<li>{risk}</li>"
                     
                 html_content += """
             </ul>
             <p><strong>建议:</strong></p>
             <ul>
 """
-                for suggestion in review.get('suggestions', []):
+                for suggestion in review.suggestions:
                     html_content += f"<li>{suggestion}</li>"
                     
+                html_content += """
+            </ul>
+            <p><strong>详细评论:</strong></p>
+            <ul>
+"""
+                for comment in review.detailed_comments:
+                    file_name = comment.get('file', '未知文件')
+                    comment_text = comment.get('comment', '')
+                    html_content += f"<li><strong>{file_name}:</strong> {comment_text}</li>"
+                
                 html_content += """
             </ul>
         </div>
