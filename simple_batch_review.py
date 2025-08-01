@@ -8,6 +8,7 @@ import os
 import sys
 import subprocess
 import json
+import argparse
 from datetime import datetime, timedelta
 
 # 添加src目录到路径
@@ -102,18 +103,14 @@ class SimpleBatchReviewer:
                 author_elem = logentry.find('author')
                 author = author_elem.text if author_elem is not None else 'unknown'
                 
-                # 过滤Jenkins提交
-                if author.lower() in ['jenkins', 'jenkins-ci', 'ci', 'build']:
-                    continue
-                
                 date_elem = logentry.find('date')
                 date_str = date_elem.text if date_elem is not None else ''
                 
                 msg_elem = logentry.find('msg')
                 message = msg_elem.text if msg_elem is not None else ''
                 
-                # 过滤自动构建相关的提交信息
-                if any(keyword in message.lower() for keyword in ['auto build', 'jenkins', 'ci build', '[bot]']):
+                # 使用配置化的过滤逻辑
+                if not self.should_include_commit(author, message):
                     continue
                 
                 commit_info = {
@@ -128,6 +125,86 @@ class SimpleBatchReviewer:
             print(f"解析XML失败: {e}")
         
         return commits
+    
+    def should_include_commit(self, author, message):
+        """判断是否应该包含此提交"""
+        filters = self.config.get('batch_review', {}).get('filters', {})
+        
+        # 获取过滤配置
+        include_authors = filters.get('include_authors', [])
+        exclude_authors = filters.get('exclude_authors', [])
+        include_message_patterns = filters.get('include_message_patterns', [])
+        exclude_message_patterns = filters.get('exclude_message_patterns', [])
+        case_sensitive = filters.get('case_sensitive', False)
+        use_regex = filters.get('use_regex', False)
+        
+        # 处理大小写
+        if not case_sensitive:
+            author_check = author.lower()
+            message_check = message.lower()
+            include_authors = [a.lower() for a in include_authors]
+            exclude_authors = [a.lower() for a in exclude_authors]
+            include_message_patterns = [p.lower() for p in include_message_patterns]
+            exclude_message_patterns = [p.lower() for p in exclude_message_patterns]
+        else:
+            author_check = author
+            message_check = message
+        
+        # 作者过滤
+        if include_authors and author_check not in include_authors:
+            return False
+        
+        if exclude_authors and author_check in exclude_authors:
+            return False
+        
+        # 消息过滤
+        if include_message_patterns:
+            if use_regex:
+                import re
+                if not any(re.search(pattern, message_check) for pattern in include_message_patterns):
+                    return False
+            else:
+                if not any(pattern in message_check for pattern in include_message_patterns):
+                    return False
+        
+        if exclude_message_patterns:
+            if use_regex:
+                import re
+                if any(re.search(pattern, message_check) for pattern in exclude_message_patterns):
+                    return False
+            else:
+                if any(pattern in message_check for pattern in exclude_message_patterns):
+                    return False
+        
+        return True
+    
+    def apply_cli_filters(self, args):
+        """应用命令行过滤参数"""
+        filters = self.config.setdefault('batch_review', {}).setdefault('filters', {})
+        
+        # 应用命令行参数
+        if args.include_authors:
+            filters['include_authors'] = args.include_authors
+        if args.exclude_authors:
+            filters['exclude_authors'] = args.exclude_authors
+        if args.include_messages:
+            filters['include_message_patterns'] = args.include_messages
+        if args.exclude_messages:
+            filters['exclude_message_patterns'] = args.exclude_messages
+        
+        # 设置匹配选项
+        filters['case_sensitive'] = args.case_sensitive
+        filters['use_regex'] = args.regex
+        
+        print(f"已应用过滤条件:")
+        if filters.get('include_authors'):
+            print(f"  包含作者: {filters['include_authors']}")
+        if filters.get('exclude_authors'):
+            print(f"  排除作者: {filters['exclude_authors']}")
+        if filters.get('include_message_patterns'):
+            print(f"  包含消息: {filters['include_message_patterns']}")
+        if filters.get('exclude_message_patterns'):
+            print(f"  排除消息: {filters['exclude_message_patterns']}")
     
     def get_commit_diff(self, revision):
         """获取提交的代码差异"""
@@ -348,18 +425,36 @@ class SimpleBatchReviewer:
         return report_path
 
 
+def parse_arguments():
+    """解析命令行参数"""
+    parser = argparse.ArgumentParser(description='SVN批量代码审查工具')
+    parser.add_argument('days', type=int, nargs='?', default=7,
+                        help='审查最近几天的提交 (默认: 7)')
+    parser.add_argument('--include-authors', nargs='*',
+                        help='只包含指定作者的提交')
+    parser.add_argument('--exclude-authors', nargs='*',
+                        help='排除指定作者的提交')
+    parser.add_argument('--include-messages', nargs='*',
+                        help='只包含匹配关键词的提交信息')
+    parser.add_argument('--exclude-messages', nargs='*',
+                        help='排除匹配关键词的提交信息')
+    parser.add_argument('--case-sensitive', action='store_true',
+                        help='启用大小写敏感匹配')
+    parser.add_argument('--regex', action='store_true',
+                        help='使用正则表达式匹配')
+    parser.add_argument('--auto-confirm', action='store_true',
+                        help='自动确认审查，不询问用户')
+    
+    return parser.parse_args()
+
+
 def main():
     """主函数"""
     print("=== SVN批量代码审查工具 ===")
     
-    # 获取参数
-    if len(sys.argv) > 1:
-        try:
-            days = int(sys.argv[1])
-        except ValueError:
-            days = 7
-    else:
-        days = 7
+    # 解析命令行参数
+    args = parse_arguments()
+    days = args.days
     
     end_date = datetime.now()
     start_date = end_date - timedelta(days=days)
@@ -367,8 +462,28 @@ def main():
     print(f"审查最近 {days} 天的提交")
     print(f"时间范围: {start_date.strftime('%Y-%m-%d')} 至 {end_date.strftime('%Y-%m-%d')}")
     
+    # 显示过滤条件
+    if args.include_authors:
+        print(f"包含作者: {', '.join(args.include_authors)}")
+    if args.exclude_authors:
+        print(f"排除作者: {', '.join(args.exclude_authors)}")
+    if args.include_messages:
+        print(f"包含消息关键词: {', '.join(args.include_messages)}")
+    if args.exclude_messages:
+        print(f"排除消息关键词: {', '.join(args.exclude_messages)}")
+    if args.case_sensitive:
+        print("启用大小写敏感匹配")
+    if args.regex:
+        print("启用正则表达式匹配")
+    
     try:
         reviewer = SimpleBatchReviewer()
+        
+        # 应用命令行过滤参数
+        if any([args.include_authors, args.exclude_authors, 
+                args.include_messages, args.exclude_messages]):
+            print("\\n应用命令行过滤参数...")
+            reviewer.apply_cli_filters(args)
         
         # 获取提交
         commits = reviewer.get_svn_commits(start_date, end_date)
@@ -378,10 +493,13 @@ def main():
             return
         
         # 确认继续
-        response = input(f"\\n找到 {len(commits)} 个提交，是否继续审查？(y/N): ")
-        if response.lower() not in ['y', 'yes']:
-            print("已取消")
-            return
+        if args.auto_confirm:
+            print(f"\\n找到 {len(commits)} 个提交，自动开始审查...")
+        else:
+            response = input(f"\\n找到 {len(commits)} 个提交，是否继续审查？(y/N): ")
+            if response.lower() not in ['y', 'yes']:
+                print("已取消")
+                return
         
         # 批量审查
         results = reviewer.batch_review(commits)
