@@ -110,7 +110,7 @@ class SimpleBatchReviewer:
                 message = msg_elem.text if msg_elem is not None else ''
                 
                 # 使用配置化的过滤逻辑
-                if not self.should_include_commit(author, message):
+                if not self.should_include_commit(author, message, revision):
                     continue
                 
                 commit_info = {
@@ -126,17 +126,32 @@ class SimpleBatchReviewer:
         
         return commits
     
-    def should_include_commit(self, author, message):
+    def should_include_commit(self, author, message, revision=None):
         """判断是否应该包含此提交"""
         filters = self.config.get('batch_review', {}).get('filters', {})
         
         # 获取过滤配置
+        revision_range = filters.get('revision_range', {})
+        min_revision = revision_range.get('min_revision')
+        max_revision = revision_range.get('max_revision')
         include_authors = filters.get('include_authors', [])
         exclude_authors = filters.get('exclude_authors', [])
         include_message_patterns = filters.get('include_message_patterns', [])
         exclude_message_patterns = filters.get('exclude_message_patterns', [])
         case_sensitive = filters.get('case_sensitive', False)
         use_regex = filters.get('use_regex', False)
+        
+        # 版本号过滤
+        if revision is not None:
+            try:
+                rev_num = int(revision)
+                if min_revision is not None and rev_num < min_revision:
+                    return False
+                if max_revision is not None and rev_num > max_revision:
+                    return False
+            except (ValueError, TypeError):
+                # 如果版本号不是数字，跳过版本号过滤
+                pass
         
         # 处理大小写
         if not case_sensitive:
@@ -182,6 +197,14 @@ class SimpleBatchReviewer:
         """应用命令行过滤参数"""
         filters = self.config.setdefault('batch_review', {}).setdefault('filters', {})
         
+        # 应用版本号范围过滤
+        if hasattr(args, 'min_revision') or hasattr(args, 'max_revision'):
+            revision_range = filters.setdefault('revision_range', {})
+            if args.min_revision is not None:
+                revision_range['min_revision'] = args.min_revision
+            if args.max_revision is not None:
+                revision_range['max_revision'] = args.max_revision
+        
         # 应用命令行参数
         if args.include_authors:
             filters['include_authors'] = args.include_authors
@@ -197,6 +220,11 @@ class SimpleBatchReviewer:
         filters['use_regex'] = args.regex
         
         print(f"已应用过滤条件:")
+        revision_range = filters.get('revision_range', {})
+        if revision_range.get('min_revision') is not None:
+            print(f"  最小版本号: {revision_range['min_revision']}")
+        if revision_range.get('max_revision') is not None:
+            print(f"  最大版本号: {revision_range['max_revision']}")
         if filters.get('include_authors'):
             print(f"  包含作者: {filters['include_authors']}")
         if filters.get('exclude_authors'):
@@ -430,6 +458,10 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='SVN批量代码审查工具')
     parser.add_argument('days', type=int, nargs='?', default=7,
                         help='审查最近几天的提交 (默认: 7)')
+    parser.add_argument('--min-revision', type=int,
+                        help='最小版本号（包含）')
+    parser.add_argument('--max-revision', type=int,
+                        help='最大版本号（包含）')
     parser.add_argument('--include-authors', nargs='*',
                         help='只包含指定作者的提交')
     parser.add_argument('--exclude-authors', nargs='*',
@@ -463,6 +495,10 @@ def main():
     print(f"时间范围: {start_date.strftime('%Y-%m-%d')} 至 {end_date.strftime('%Y-%m-%d')}")
     
     # 显示过滤条件
+    if args.min_revision is not None:
+        print(f"最小版本号: {args.min_revision}")
+    if args.max_revision is not None:
+        print(f"最大版本号: {args.max_revision}")
     if args.include_authors:
         print(f"包含作者: {', '.join(args.include_authors)}")
     if args.exclude_authors:
@@ -480,7 +516,8 @@ def main():
         reviewer = SimpleBatchReviewer()
         
         # 应用命令行过滤参数
-        if any([args.include_authors, args.exclude_authors, 
+        if any([args.min_revision is not None, args.max_revision is not None,
+                args.include_authors, args.exclude_authors, 
                 args.include_messages, args.exclude_messages]):
             print("\\n应用命令行过滤参数...")
             reviewer.apply_cli_filters(args)
