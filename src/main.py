@@ -14,7 +14,7 @@ from pathlib import Path
 # 添加当前目录到Python路径
 sys.path.append(str(Path(__file__).parent))
 
-from config_manager import config
+from config_manager import get_config
 from svn_monitor import SVNMonitor
 from enhanced_monitor import EnhancedSVNMonitor
 from ai_reviewer import AIReviewer
@@ -23,6 +23,7 @@ from dingtalk_bot import DingTalkBot
 
 def setup_logging():
     """设置日志配置"""
+    config = get_config()
     log_level = getattr(
         logging,
         config.get('logging.level', 'INFO').upper()
@@ -122,6 +123,8 @@ def process_new_commits():
 
 def main():
     """主函数"""
+    config = get_config()
+    
     # 检查命令行参数，确定运行模式
     enhanced_mode = config.get('monitor.enhanced_mode', False)
     webhook_port = config.get('monitor.webhook_port', 8080)

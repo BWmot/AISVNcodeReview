@@ -17,12 +17,13 @@ def main():
     print()
     
     # 检查文件存在性
+    parent_dir = os.path.dirname(os.path.dirname(__file__))  # 获取项目根目录
     required_files = [
         "simple_batch_review.py",
         "batch_review.bat",
-        "src/config_manager.py",
-        "src/ai_reviewer.py",
-        "config/config.example.yaml"
+        os.path.join(parent_dir, "src/config_manager.py"),
+        os.path.join(parent_dir, "src/ai_reviewer.py"),
+        os.path.join(parent_dir, "config/config.example.yaml")
     ]
     
     print("📋 检查必要文件...")

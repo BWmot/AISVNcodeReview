@@ -13,7 +13,8 @@ from datetime import datetime, timedelta
 
 # 添加src目录到路径
 current_dir = os.path.dirname(os.path.abspath(__file__))
-src_path = os.path.join(current_dir, 'src')
+parent_dir = os.path.dirname(current_dir)  # 获取项目根目录
+src_path = os.path.join(parent_dir, 'src')
 sys.path.insert(0, src_path)
 
 try:

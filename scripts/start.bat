@@ -2,6 +2,9 @@
 chcp 65001
 title AI SVN Code Review Tool
 
+REM 切换到项目根目录
+cd /d "%~dp0.."
+
 echo ========================================
 echo   AI SVN 代码审查工具
 echo ========================================

@@ -13,7 +13,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 # 添加src目录到路径
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+current_dir = os.path.dirname(__file__)
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(os.path.join(parent_dir, 'src'))
 
 from config_manager import ConfigManager
 from batch_reviewer import BatchReviewer

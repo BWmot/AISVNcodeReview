@@ -10,8 +10,14 @@ from pathlib import Path
 
 
 class ConfigManager:
-    def __init__(self, config_path: str = "config/config.yaml"):
-        self.config_path = config_path
+    def __init__(self, config_path: str = None):
+        if config_path is None:
+            # 自动检测配置文件位置
+            current_dir = Path(__file__).parent
+            project_root = current_dir.parent
+            config_path = project_root / "config" / "config.yaml"
+        
+        self.config_path = str(config_path)
         self.config = {}
         self.user_mapping = {}
         self.load_config()
@@ -30,7 +36,8 @@ class ConfigManager:
     
     def load_user_mapping(self) -> Dict[str, str]:
         """加载用户映射配置"""
-        mapping_file = self.get('user_mapping_file', 'config/user_mapping.yaml')
+        default_mapping_file = str(Path(self.config_path).parent / 'user_mapping.yaml')
+        mapping_file = self.get('user_mapping_file', default_mapping_file)
         try:
             with open(mapping_file, 'r', encoding='utf-8') as file:
                 mapping_data = yaml.safe_load(file)
@@ -88,5 +95,12 @@ class ConfigManager:
             Path(dir_path).mkdir(parents=True, exist_ok=True)
 
 
-# 全局配置实例
-config = ConfigManager()
+# 全局配置实例（延迟初始化）
+config = None
+
+def get_config():
+    """获取全局配置实例，延迟初始化"""
+    global config
+    if config is None:
+        config = ConfigManager()
+    return config
