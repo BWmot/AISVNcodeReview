@@ -4,7 +4,44 @@
 
 ## ✨ 核心功能
 
-- 🔍 **实时监控**: 自动监控SVN提交，AI智能代码分析
+- 🔍 **实时监控**: 自动监控S## � 项目结构
+
+```
+AISVNcodeReview/
+├── src/                    # 核心源代码
+│   ├── main.py            # 主程序入口
+│   ├── ai_reviewer.py     # AI 代码审查模块
+│   ├── svn_monitor.py     # SVN 监控模块
+│   └── dingtalk_bot.py    # 钉钉通知模块
+├── batch/                  # 批量审查工具
+│   ├── simple_batch_review.py  # 简化版批量审查（推荐）
+│   ├── batch_review.py    # 完整版批量审查
+│   └── batch_review.bat   # Windows 启动脚本
+├── tests/                  # 测试文件
+│   ├── test_filters.py    # 过滤功能测试
+│   └── test_*.py          # 其他测试文件
+├── scripts/                # 安装和启动脚本
+│   ├── setup_enhanced.bat # 增强安装脚本
+│   ├── start.bat          # 启动脚本
+│   └── service_manager.bat # 服务管理脚本
+├── tools/                  # 实用工具
+│   ├── debug_svn.py       # SVN 调试工具
+│   ├── diagnose.py        # 系统诊断工具
+│   └── cleanup.py         # 数据清理工具
+├── config/                 # 配置文件
+├── docs/                   # 项目文档
+├── data/                   # 数据文件
+└── logs/                   # 日志文件
+```
+
+- 📖 [文档目录](docs/README.md) - 完整文档列表和阅读指南
+- 📖 [用户指南](docs/USER_GUIDE.md) - 详细使用说明
+- 📖 [批量审查指南](docs/BATCH_REVIEW_GUIDE.md) - 批量审查功能
+- 📖 [过滤功能指南](docs/FILTER_GUIDE.md) - 过滤功能详细说明
+- 📖 [配置指南](docs/CONFIGURATION.md) - 详细配置说明
+- 🚀 [部署指南](docs/DEPLOYMENT.md) - 生产环境部署
+- 🔧 [故障排除](docs/TROUBLESHOOTING.md) - 常见问题解决
+- 📋 [项目总结](docs/PROJECT_SUMMARY.md) - 项目概况能代码分析
 - 📊 **批量审查**: 批量分析历史提交，生成详细报告
 - 🤖 **AI驱动**: 集成OpenAI兼容API，智能发现代码问题
 - 📱 **钉钉通知**: 自动@相关人员，发送审查结果
