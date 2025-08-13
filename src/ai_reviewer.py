@@ -37,7 +37,127 @@ class AIReviewer:
         self.diff_limit = config.get('ai.diff_limit', 8000)  # diff内容截断长度
         self.enable_chunked_review = config.get('ai.enable_chunked_review', True)  # 启用分块审查
         self.chunk_size = config.get('ai.chunk_size', 15000)  # 分块大小
+        
+        # 文件过滤配置
+        file_filters = config.get('batch_review.file_filters', {})
+        self.enable_file_filtering = file_filters.get('enable_file_filtering', True)
+        self.exclude_extensions = [ext.lower() for ext in file_filters.get('exclude_extensions', [])]
+        self.include_extensions = [ext.lower() for ext in file_filters.get('include_extensions', [])]
+        self.show_filter_stats = file_filters.get('show_filter_stats', True)
+        
         self.logger = logging.getLogger(__name__)
+    
+    def filter_files_for_review(self, changed_files: List[Dict], monitor=None) -> tuple:
+        """过滤需要审查的文件，返回(filtered_files, filter_stats)"""
+        if not self.enable_file_filtering:
+            return changed_files, None
+        
+        original_count = len(changed_files)
+        filtered_files = []
+        excluded_files = []
+        
+        for file_info in changed_files:
+            file_path = file_info.get('path', '')
+            if not file_path:
+                continue
+                
+            # 获取文件扩展名
+            import os
+            _, ext = os.path.splitext(file_path)
+            ext = ext.lower()
+            
+            # 判断是否应该排除
+            should_exclude = False
+            
+            # 检查排除列表
+            if ext in self.exclude_extensions:
+                should_exclude = True
+                excluded_files.append({'path': file_path, 'reason': f'排除扩展名: {ext}'})
+            
+            # 检查包含列表（如果指定了包含列表）
+            elif self.include_extensions and ext not in self.include_extensions:
+                should_exclude = True
+                excluded_files.append({'path': file_path, 'reason': f'不在包含列表: {ext}'})
+            
+            if not should_exclude:
+                filtered_files.append(file_info)
+        
+        # 生成过滤统计
+        filter_stats = {
+            'original_count': original_count,
+            'filtered_count': len(filtered_files),
+            'excluded_count': len(excluded_files),
+            'excluded_files': excluded_files
+        }
+        
+        if monitor and self.show_filter_stats:
+            monitor.log_details(f"文件过滤: {original_count} -> {len(filtered_files)} "
+                              f"(排除 {len(excluded_files)} 个)", 2)
+            if excluded_files:
+                for excluded in excluded_files[:5]:  # 只显示前5个
+                    monitor.log_details(f"  排除: {excluded['path']} ({excluded['reason']})", 3)
+                if len(excluded_files) > 5:
+                    monitor.log_details(f"  ... 还有 {len(excluded_files) - 5} 个文件被排除", 3)
+        
+        return filtered_files, filter_stats
+    
+    def _filter_diff_content(self, diff_content: str, filtered_files: List[Dict]) -> str:
+        """根据过滤后的文件列表过滤diff内容"""
+        if not filtered_files:
+            return ""
+        
+        # 获取过滤后的文件路径集合
+        filtered_paths = set()
+        for file_info in filtered_files:
+            path = file_info.get('path', '')
+            if path:
+                # 处理各种路径格式
+                filtered_paths.add(path)
+                if path.startswith('/'):
+                    filtered_paths.add(path[1:])
+                else:
+                    filtered_paths.add('/' + path)
+        
+        # 分割diff内容按文件
+        lines = diff_content.split('\n')
+        filtered_lines = []
+        current_file_included = False
+        current_file_path = None
+        in_file_content = False
+        
+        for line in lines:
+            # 检测文件分界线
+            if line.startswith('Index: '):
+                current_file_path = line.replace('Index: ', '').strip()
+                # 检查这个文件是否在过滤后的列表中
+                current_file_included = any(
+                    current_file_path in filtered_paths or
+                    current_file_path.endswith(path.lstrip('/')) or
+                    path.lstrip('/').endswith(current_file_path) or
+                    current_file_path == path.lstrip('/')
+                    for path in [f.get('path', '') for f in filtered_files]
+                )
+                in_file_content = True
+                if current_file_included:
+                    filtered_lines.append(line)
+            elif line.startswith('==='):
+                # 分隔线
+                if current_file_included:
+                    filtered_lines.append(line)
+            elif line.startswith('---') or line.startswith('+++'):
+                # 文件头信息
+                if current_file_included:
+                    filtered_lines.append(line)
+            elif line.startswith('@@'):
+                # 差异块头
+                if current_file_included:
+                    filtered_lines.append(line)
+            else:
+                # 文件内容行
+                if current_file_included and in_file_content:
+                    filtered_lines.append(line)
+        
+        return '\n'.join(filtered_lines)
     
     def review_commit(self, commit: SVNCommit, monitor=None) -> Optional[ReviewResult]:
         """对提交进行AI代码审查"""
@@ -45,10 +165,40 @@ class AIReviewer:
             if monitor:
                 monitor.log_details("构建审查提示...", 2)
             
+            # 应用文件过滤
+            if self.enable_file_filtering and commit.changed_files:
+                filtered_files, filter_stats = self.filter_files_for_review(
+                    commit.changed_files, monitor)
+                
+                # 如果所有文件都被过滤掉了，跳过审查
+                if not filtered_files:
+                    if monitor:
+                        monitor.log_details("所有文件都被过滤，跳过审查", 2)
+                    return ReviewResult(
+                        commit_revision=commit.revision,
+                        overall_score=8,  # 默认分数
+                        summary=f"提交包含 {filter_stats['original_count']} 个文件，"
+                               f"全部为非代码文件(图片、视频等)，已自动跳过审查",
+                        detailed_comments=[],
+                        suggestions=[],
+                        risks=[]
+                    )
+                
+                # 更新commit对象的文件列表
+                filtered_commit = SVNCommit(
+                    revision=commit.revision,
+                    author=commit.author,
+                    date=commit.date,
+                    message=commit.message,
+                    changed_files=filtered_files,
+                    diff_content=self._filter_diff_content(commit.diff_content, filtered_files)
+                )
+                commit = filtered_commit
+            
             # 检查diff内容大小
             diff_size = len(commit.diff_content)
             if monitor:
-                monitor.log_details(f"原始diff大小: {diff_size:,} 字符", 2)
+                monitor.log_details(f"过滤后diff大小: {diff_size:,} 字符", 2)
             
             # 根据大小决定审查策略
             if self.enable_chunked_review and diff_size > self.chunk_size:

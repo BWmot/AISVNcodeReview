@@ -1,12 +1,25 @@
+# ==========================================
+# AI SVN代码审查工具 - 配置示例文件
+# ==========================================
+# 请根据您的环境修改以下配置，并重命名为 config.yaml
+
 # SVN配置
 svn:
-  repository_url: "https://your-svn-server/svn/project"
-  username: "svn_username"
-  password: "svn_password"
+  repository_url: "https://your-svn-server/svn/project"  # 替换为您的SVN仓库URL
+  username: "svn_username"  # 替换为您的SVN用户名
+  password: "svn_password"  # 替换为您的SVN密码
   check_interval: 300  # 检查间隔（秒）
-  monitored_paths:
+  monitored_paths:  # 监控的路径列表
     - "/trunk/src"
     - "/branches/dev"
+    - "/src"
+    - "/lib"
+    # Unity项目示例路径
+    # - "/Assets/Scripts"
+    # - "/Assets/Plugins"
+    # Web项目示例路径
+    # - "/frontend/src"
+    # - "/backend/api"
 
 # 监控模式配置
 monitor:
@@ -19,10 +32,16 @@ monitor:
 # AI API配置
 ai:
   api_base: "https://api.openai.com/v1"  # OpenAI兼容的API基础URL
-  api_key: "your_openai_api_key"
-  model: "gpt-3.5-turbo"
-  max_tokens: 2000
-  temperature: 0.3
+  api_key: "your_openai_api_key"  # 替换为您的API密钥
+  model: "gpt-3.5-turbo"  # 使用的模型，支持: gpt-3.5-turbo, gpt-4, claude-3-sonnet等
+  max_tokens: 4000  # 响应最大token数（推荐4000以支持大型提交）
+  temperature: 0.3  # 创造性参数，0-1之间，越低越保守
+  
+  # 大型提交处理配置（新增功能）
+  diff_limit: 25000  # diff内容截断长度（字符数），推荐25000
+  enable_chunked_review: true  # 启用分块审查（推荐开启）
+  chunk_size: 20000  # 分块大小（字符数）
+  
   system_prompt: |
     你是一个专业的代码审查助手。请分析以下代码变更，并提供建设性的审查意见。
     重点关注：
@@ -34,16 +53,22 @@ ai:
 
 # 钉钉机器人配置
 dingtalk:
-  webhook_url: "https://oapi.dingtalk.com/robot/send?access_token=your_token"
-  secret: "your_dingtalk_secret"  # 可选，用于签名验证
+  webhook_url: "https://oapi.dingtalk.com/robot/send?access_token=YOUR_ACCESS_TOKEN"
+  secret: "YOUR_SECRET_KEY"  # 可选，用于签名验证
   at_all: false  # 是否@所有人
-  
+  message_settings:
+    max_message_length: 1000  # 单条消息最大长度
+    enable_message_split: true  # 是否启用消息分割
+    show_all_comments: true  # 是否显示所有评论
+    comment_max_length: 150  # 单条评论最大长度
+    suggestion_max_length: 200  # 单条建议最大长度
+
 # 用户映射配置文件路径
 user_mapping_file: "config/user_mapping.yaml"
 
 # 日志配置
 logging:
-  level: "INFO"
+  level: "INFO"  # 日志级别: DEBUG, INFO, WARNING, ERROR
   file: "logs/code_review.log"
   max_size_mb: 10
   backup_count: 5
@@ -62,10 +87,141 @@ batch_review:
   include_code_diff: true  # 是否在报告中包含代码差异
   max_diff_lines: 500     # 单个文件差异最大显示行数
   
+  # 文件过滤配置（新增功能 - 自动排除图片等非代码文件）
+  file_filters:
+    # 排除的文件扩展名（不区分大小写）
+    exclude_extensions:
+      # 图片文件
+      - ".jpg"
+      - ".jpeg"
+      - ".png"
+      - ".gif"
+      - ".bmp"
+      - ".tiff"
+      - ".webp"
+      - ".ico"
+      - ".svg"
+      # 视频文件  
+      - ".mp4"
+      - ".avi"
+      - ".mov"
+      - ".wmv"
+      - ".flv"
+      - ".mkv"
+      - ".webm"
+      # 音频文件
+      - ".mp3"
+      - ".wav"
+      - ".flac"
+      - ".aac"
+      - ".ogg"
+      - ".wma"
+      # 压缩文件
+      - ".zip"
+      - ".rar"
+      - ".7z"
+      - ".tar"
+      - ".gz"
+      - ".bz2"
+      # 二进制文件
+      - ".exe"
+      - ".dll"
+      - ".so"
+      - ".dylib"
+      - ".bin"
+      - ".dat"
+      # 办公文档
+      - ".pdf"
+      - ".doc"
+      - ".docx"
+      - ".xls"
+      - ".xlsx"
+      - ".ppt"
+      - ".pptx"
+      # 字体文件
+      - ".ttf"
+      - ".otf"
+      - ".woff"
+      - ".woff2"
+      # Unity特定资源文件（Unity项目启用）
+      - ".asset"
+      - ".prefab"
+      - ".mat"
+      - ".unity"
+      - ".meta"  # Unity元文件
+      # 其他可选排除的文件类型
+      # - ".log"    # 日志文件
+      # - ".tmp"    # 临时文件
+      # - ".cache"  # 缓存文件
+      # - ".lock"   # 锁文件
+    
+    # 包含的文件扩展名（白名单模式，如果指定则只审查这些类型）
+    include_extensions: []  # 空数组表示不限制，审查所有未被排除的文件
+    # 示例白名单配置（只审查代码文件）:
+    # include_extensions:
+    #   - ".py"      # Python
+    #   - ".js"      # JavaScript
+    #   - ".ts"      # TypeScript
+    #   - ".java"    # Java
+    #   - ".cs"      # C#
+    #   - ".cpp"     # C++
+    #   - ".c"       # C
+    #   - ".h"       # 头文件
+    #   - ".php"     # PHP
+    #   - ".rb"      # Ruby
+    #   - ".go"      # Go
+    #   - ".rs"      # Rust
+    #   - ".lua"     # Lua
+    #   - ".sql"     # SQL
+    #   - ".json"    # JSON配置
+    #   - ".xml"     # XML配置
+    #   - ".yaml"    # YAML配置
+    #   - ".yml"     # YAML配置
+    
+    # 是否启用文件过滤
+    enable_file_filtering: true
+    
+    # 过滤统计
+    show_filter_stats: true  # 显示过滤统计信息
+  
   # 审查范围配置
   default_paths:
     - "/trunk/src"
     - "/branches/dev"
+  
+  # 过滤配置
+  filters:
+    # 版本号过滤
+    revision_range:
+      min_revision: null    # 最小版本号（包含），null表示不限制
+      max_revision: null    # 最大版本号（包含），null表示不限制
+    
+    # 作者过滤
+    include_authors: []     # 只包含指定作者的提交（空数组表示包含所有）
+    exclude_authors:        # 排除指定作者的提交
+      - "jenkins"
+      - "jenkins-ci"
+      - "ci"
+      - "build"
+      - "auto-deploy"
+      - "bot"
+      - "github-actions"
+    
+    # 提交信息过滤
+    include_message_patterns: []  # 只包含匹配模式的提交信息（空数组表示包含所有）
+    exclude_message_patterns:     # 排除匹配模式的提交信息
+      - "auto build"
+      - "jenkins"
+      - "ci build"
+      - "[bot]"
+      - "merge branch"
+      - "automatic"
+      - "auto-generated"
+      - "version bump"
+    
+    # 高级过滤选项
+    case_sensitive: false   # 是否区分大小写
+    use_regex: false       # 是否使用正则表达式匹配
   
   # AI审查配置（批量模式专用）
   ai_settings:
@@ -79,3 +235,54 @@ batch_review:
     statistics: true     # 包含统计信息
     recommendations: true # 包含改进建议
     detailed_reviews: true # 包含详细审查内容
+
+# ==========================================
+# 快速配置向导
+# ==========================================
+# 1. 基础必填配置:
+#    ✅ svn.repository_url     - SVN仓库地址
+#    ✅ svn.username           - SVN用户名
+#    ✅ svn.password           - SVN密码
+#    ✅ ai.api_base            - AI API地址
+#    ✅ ai.api_key             - AI API密钥
+#    ⚠️  dingtalk.webhook_url   - 钉钉通知(可选)
+#
+# 2. 路径配置:
+#    ✅ svn.monitored_paths    - 监控的SVN路径
+#    ✅ batch_review.default_paths - 批量审查默认路径
+#
+# 3. 项目类型优化:
+#    📱 Unity项目: 保留Unity相关文件排除配置
+#    🌐 Web项目: 可移除Unity相关排除项，增加前端资源排除
+#    🖥️ 后端项目: 可增加前端资源文件排除
+#    📚 通用项目: 使用默认配置即可
+#
+# 4. 性能调优建议:
+#    🏗️  大型项目: 
+#        - ai.diff_limit: 50000
+#        - ai.max_tokens: 8000
+#        - ai.chunk_size: 30000
+#    🏠 小型项目: 
+#        - ai.diff_limit: 15000  
+#        - ai.max_tokens: 3000
+#        - ai.chunk_size: 10000
+#    🐌 慢速网络: 
+#        - batch_review.ai_settings.delay_between_batches: 5
+#
+# 5. 团队协作配置:
+#    👥 多人团队: 配置user_mapping.yaml进行用户映射
+#    🤖 CI/CD集成: 调整filters.exclude_authors和exclude_message_patterns
+#    📊 详细报告: 启用所有report_sections选项
+#
+# 6. 成本控制:
+#    💰 节省API成本: 
+#        - 启用file_filters减少不必要的审查
+#        - 使用include_extensions只审查关键文件
+#        - 适当降低max_tokens
+#    ⚡ 提升效率:
+#        - 启用enable_chunked_review处理大型提交
+#        - 合理设置batch_size
+#
+# 配置完成后，运行测试命令验证配置:
+# python debugTools/test_large_commit_fixes.py
+# python debugTools/test_file_filters.py
