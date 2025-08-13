@@ -9,7 +9,7 @@ import logging
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 
-from config_manager import config
+from config_manager import get_config
 from svn_monitor import SVNCommit
 
 
@@ -26,6 +26,7 @@ class ReviewResult:
 
 class AIReviewer:
     def __init__(self):
+        config = get_config()
         self.api_base = config.get('ai.api_base')
         self.api_key = config.get('ai.api_key')
         self.model = config.get('ai.model', 'gpt-3.5-turbo')

@@ -31,13 +31,20 @@ except ImportError as e:
 class SimpleBatchReviewer:
     """简化版批量审查器"""
     
-    def __init__(self, config_path="config/config.yaml"):
+    def __init__(self, config_path=None):
+        if config_path is None:
+            # 自动检测配置文件路径
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            parent_dir = os.path.dirname(current_dir)
+            config_path = os.path.join(parent_dir, "config", "config.yaml")
+        
         self.config_manager = ConfigManager(config_path)
         self.config = self.config_manager.config
         self.ai_reviewer = AIReviewer()
         
-        # 创建报告目录
-        self.reports_dir = "reports"
+        # 创建报告目录 - 也需要相对于项目根目录
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.reports_dir = os.path.join(parent_dir, "reports")
         os.makedirs(self.reports_dir, exist_ok=True)
     
     def get_svn_commits(self, start_date, end_date, paths=None):

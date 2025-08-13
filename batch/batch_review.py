@@ -31,6 +31,11 @@ def parse_date(date_str):
 
 def main():
     """主函数"""
+    # 获取正确的配置文件路径
+    current_dir = os.path.dirname(__file__)
+    parent_dir = os.path.dirname(current_dir)
+    default_config = os.path.join(parent_dir, 'config', 'config.yaml')
+    
     parser = argparse.ArgumentParser(description='SVN批量代码审查工具')
     
     parser.add_argument('--start-date', type=parse_date, 
@@ -43,7 +48,7 @@ def main():
                        help='指定要审查的SVN路径')
     parser.add_argument('--output-format', choices=['html', 'markdown', 'json'],
                        default='html', help='报告输出格式')
-    parser.add_argument('--config', default='config/config.yaml',
+    parser.add_argument('--config', default=default_config,
                        help='配置文件路径')
     parser.add_argument('--output-dir', default='reports',
                        help='报告输出目录')
