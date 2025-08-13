@@ -9,6 +9,7 @@ import sys
 import subprocess
 import json
 import argparse
+import time
 from datetime import datetime, timedelta
 
 # 添加src目录到路径
@@ -41,6 +42,89 @@ except ImportError as e:
     print("   python batch/simple_batch_review.py 7")
     print("=" * 60)
     sys.exit(1)
+
+
+class ProgressMonitor:
+    """进度监控器"""
+    
+    def __init__(self, total_commits):
+        self.total_commits = total_commits
+        self.current_commit = 0
+        self.start_time = time.time()
+        self.stage_start_time = time.time()
+        self.stages = {}
+        
+    def start_commit(self, commit_index, revision):
+        """开始处理提交"""
+        self.current_commit = commit_index
+        self.stage_start_time = time.time()
+        elapsed = time.time() - self.start_time
+        
+        if commit_index > 1:
+            avg_time = elapsed / (commit_index - 1)
+            remaining_commits = self.total_commits - commit_index + 1
+            eta = remaining_commits * avg_time
+            eta_str = self._format_time(eta)
+        else:
+            eta_str = "计算中..."
+        
+        print(f"\n{'='*60}")
+        print(f"📋 处理进度: [{commit_index}/{self.total_commits}] ({(commit_index/self.total_commits*100):.1f}%)")
+        print(f"🔄 当前版本: {revision}")
+        print(f"⏱️  已用时间: {self._format_time(elapsed)}")
+        print(f"⏰ 预计剩余: {eta_str}")
+        print(f"{'='*60}")
+    
+    def start_stage(self, stage_name):
+        """开始处理阶段"""
+        self.stage_start_time = time.time()
+        print(f"🔸 {stage_name}...")
+        
+    def end_stage(self, stage_name, success=True):
+        """结束处理阶段"""
+        elapsed = time.time() - self.stage_start_time
+        status = "✅" if success else "❌"
+        print(f"  {status} {stage_name} - 耗时: {self._format_time(elapsed)}")
+        
+        if stage_name not in self.stages:
+            self.stages[stage_name] = []
+        self.stages[stage_name].append(elapsed)
+    
+    def log_details(self, message, indent=1):
+        """记录详细信息"""
+        prefix = "  " * indent + "🔹 "
+        print(f"{prefix}{message}")
+    
+    def show_final_stats(self):
+        """显示最终统计"""
+        total_time = time.time() - self.start_time
+        print(f"\n{'='*60}")
+        print(f"📊 批量审查完成统计")
+        print(f"{'='*60}")
+        print(f"⏱️  总用时: {self._format_time(total_time)}")
+        print(f"📝 总提交数: {self.total_commits}")
+        print(f"⚡ 平均每提交: {self._format_time(total_time / max(1, self.total_commits))}")
+        
+        print(f"\n📋 各阶段耗时统计:")
+        for stage, times in self.stages.items():
+            avg_time = sum(times) / len(times)
+            total_stage_time = sum(times)
+            print(f"  🔸 {stage}:")
+            print(f"     总计: {self._format_time(total_stage_time)} | 平均: {self._format_time(avg_time)} | 次数: {len(times)}")
+    
+    def _format_time(self, seconds):
+        """格式化时间显示"""
+        if seconds < 60:
+            return f"{seconds:.1f}秒"
+        elif seconds < 3600:
+            minutes = int(seconds // 60)
+            secs = seconds % 60
+            return f"{minutes}分{secs:.1f}秒"
+        else:
+            hours = int(seconds // 3600)
+            minutes = int((seconds % 3600) // 60)
+            secs = seconds % 60
+            return f"{hours}时{minutes}分{secs:.1f}秒"
 
 
 class SimpleBatchReviewer:
@@ -257,13 +341,19 @@ class SimpleBatchReviewer:
         if filters.get('exclude_message_patterns'):
             print(f"  排除消息: {filters['exclude_message_patterns']}")
     
-    def get_commit_diff(self, revision):
+    def get_commit_diff(self, revision, monitor=None):
         """获取提交的代码差异"""
+        if monitor:
+            monitor.start_stage("获取代码差异")
+        
         repository_url = self.config['svn']['repository_url']
         username = self.config['svn']['username']
         password = self.config['svn']['password']
         
         try:
+            if monitor:
+                monitor.log_details(f"执行SVN diff命令 (版本: {revision})")
+                
             cmd = [
                 'svn', 'diff',
                 f'{repository_url}',
@@ -274,46 +364,156 @@ class SimpleBatchReviewer:
                 '--trust-server-cert'
             ]
             
+            if monitor:
+                monitor.log_details("等待SVN服务器响应...")
+            
             result = subprocess.run(cmd, capture_output=True, text=True,
                                   encoding='utf-8', timeout=120)
             
             if result.returncode == 0:
+                diff_size = len(result.stdout)
+                if monitor:
+                    monitor.log_details(f"获取到 {diff_size} 字符的差异内容")
+                    monitor.end_stage("获取代码差异", True)
                 return result.stdout
             else:
-                return f"获取差异失败: {result.stderr}"
+                error_msg = f"获取差异失败: {result.stderr}"
+                if monitor:
+                    monitor.log_details(f"SVN命令失败: {result.stderr}", 2)
+                    monitor.end_stage("获取代码差异", False)
+                return error_msg
+                
+        except subprocess.TimeoutExpired:
+            error_msg = "获取差异超时 (120秒)"
+            if monitor:
+                monitor.log_details("SVN命令执行超时", 2)
+                monitor.end_stage("获取代码差异", False)
+            return error_msg
+        except Exception as e:
+            error_msg = f"获取差异异常: {e}"
+            if monitor:
+                monitor.log_details(f"发生异常: {str(e)}", 2)
+                monitor.end_stage("获取代码差异", False)
+            return error_msg
+    
+    def get_changed_files(self, revision, monitor=None):
+        """获取提交的变更文件列表"""
+        if monitor:
+            monitor.log_details(f"获取版本 {revision} 的文件变更列表", 2)
+        
+        repository_url = self.config['svn']['repository_url']
+        username = self.config['svn']['username']
+        password = self.config['svn']['password']
+        
+        try:
+            cmd = [
+                'svn', 'log',
+                repository_url,
+                f'-r{revision}',
+                '--xml',
+                '--verbose',
+                '--username', username,
+                '--password', password,
+                '--non-interactive',
+                '--trust-server-cert'
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True,
+                                  encoding='utf-8', timeout=60)
+            
+            if result.returncode == 0:
+                import xml.etree.ElementTree as ET
+                root = ET.fromstring(result.stdout)
+                logentry = root.find('logentry')
+                changed_files = []
+                
+                if logentry is not None:
+                    paths = logentry.find('paths')
+                    if paths is not None:
+                        for path in paths.findall('path'):
+                            file_info = {
+                                'path': path.text,
+                                'action': path.get('action', ''),
+                                'kind': path.get('kind', 'file')
+                            }
+                            changed_files.append(file_info)
+                
+                if monitor:
+                    monitor.log_details(f"找到 {len(changed_files)} 个变更文件", 2)
+                
+                return changed_files
+            else:
+                if monitor:
+                    monitor.log_details(f"获取文件列表失败: {result.stderr}", 2)
+                return []
                 
         except Exception as e:
-            return f"获取差异异常: {e}"
+            if monitor:
+                monitor.log_details(f"获取文件列表异常: {str(e)}", 2)
+            return []
     
     def batch_review(self, commits):
         """批量审查提交"""
         results = []
         total = len(commits)
         
-        print(f"开始审查 {total} 个提交...")
+        # 创建进度监控器
+        monitor = ProgressMonitor(total)
+        
+        print(f"🚀 开始批量审查 {total} 个提交...")
         
         for i, commit in enumerate(commits, 1):
             revision = commit['revision']
-            print(f"[{i}/{total}] 审查版本 {revision}")
+            
+            # 开始处理当前提交
+            monitor.start_commit(i, revision)
             
             try:
-                # 获取代码差异
-                diff_content = self.get_commit_diff(revision)
+                # 阶段1: 获取代码差异
+                diff_content = self.get_commit_diff(revision, monitor)
+                
+                # 阶段2: 准备审查数据
+                monitor.start_stage("准备审查数据")
+                monitor.log_details(f"作者: {commit['author']}")
+                monitor.log_details(f"提交信息: {commit['message'][:100]}{'...' if len(commit['message']) > 100 else ''}")
+                
+                # 获取详细的文件变更信息
+                changed_files = self.get_changed_files(revision, monitor)
                 
                 # 创建SVNCommit对象
-                commit_date = datetime.fromisoformat(commit['date'].replace('Z', '+00:00')) if commit['date'] else datetime.now()
+                commit_date = (datetime.fromisoformat(commit['date'].replace('Z', '+00:00')) 
+                             if commit['date'] else datetime.now())
                 svn_commit = SVNCommit(
                     revision=commit['revision'],
                     author=commit['author'],
                     date=commit_date,
                     message=commit['message'],
-                    changed_files=[],  # 简化版暂时不获取详细文件信息
+                    changed_files=changed_files,  # 使用实际的文件变更信息
                     diff_content=diff_content
                 )
                 
-                # AI审查
-                review_result = self.ai_reviewer.review_commit(svn_commit)
+                # 统计差异信息
+                diff_lines = len(diff_content.split('\n')) if diff_content else 0
+                monitor.log_details(f"差异行数: {diff_lines}")
+                monitor.log_details(f"变更文件: {len(changed_files)} 个")
+                monitor.end_stage("准备审查数据", True)
                 
+                # 阶段3: AI审查
+                monitor.start_stage("AI智能审查")
+                monitor.log_details("发送请求到AI服务...")
+                
+                review_result = self.ai_reviewer.review_commit(svn_commit, monitor)
+                
+                if review_result:
+                    monitor.log_details(f"AI评分: {review_result.overall_score}/10")
+                    monitor.log_details(f"发现风险: {len(review_result.risks)} 个")
+                    monitor.log_details(f"改进建议: {len(review_result.suggestions)} 个")
+                    monitor.end_stage("AI智能审查", True)
+                else:
+                    monitor.log_details("AI审查返回空结果", 2)
+                    monitor.end_stage("AI智能审查", False)
+                
+                # 构建结果
                 result = {
                     'commit': commit,
                     'diff': diff_content,
@@ -322,13 +522,12 @@ class SimpleBatchReviewer:
                     'success': review_result is not None
                 }
                 
-                if review_result:
-                    print(f"  ✓ 审查成功")
-                else:
-                    print(f"  ✗ 审查失败")
+                print(f"✅ 版本 {revision} 审查完成")
                 
             except Exception as e:
-                print(f"  ✗ 错误: {e}")
+                monitor.log_details(f"处理异常: {str(e)}", 2)
+                monitor.end_stage("异常处理", False)
+                
                 result = {
                     'commit': commit,
                     'diff': '',
@@ -337,8 +536,17 @@ class SimpleBatchReviewer:
                     'success': False,
                     'error': str(e)
                 }
+                
+                print(f"❌ 版本 {revision} 审查失败: {e}")
             
             results.append(result)
+            
+            # 在提交之间添加短暂延迟，避免过于频繁的API调用
+            if i < total:
+                time.sleep(1)
+        
+        # 显示最终统计
+        monitor.show_final_stats()
         
         return results
     
