@@ -23,8 +23,23 @@ try:
     from svn_monitor import SVNCommit
     import xml.etree.ElementTree as ET
 except ImportError as e:
-    print(f"导入错误: {e}")
-    print(f"请确保src目录存在并包含必要的模块")
+    print("=" * 60)
+    print("❌ 导入错误:", str(e))
+    print("=" * 60)
+    print("🔧 解决方案:")
+    print("1. 安装依赖包:")
+    print("   pip install -r requirements.txt")
+    print("   或者:")
+    print("   pip install pyyaml requests schedule")
+    print()
+    print("2. 确保在项目根目录或正确设置Python路径")
+    print("3. 如果使用虚拟环境，请先激活虚拟环境")
+    print()
+    print("📋 完整安装步骤:")
+    print("   cd /path/to/project")
+    print("   pip install -r requirements.txt")
+    print("   python batch/simple_batch_review.py 7")
+    print("=" * 60)
     sys.exit(1)
 
 

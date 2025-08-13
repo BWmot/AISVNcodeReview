@@ -49,16 +49,34 @@ AISVNcodeReview/
 
 ## 🚀 快速开始
 
-### 1. 安装依赖
-```bash
-pip install -r requirements.txt
+📋 **[完整安装指南](INSTALL_GUIDE.md)** - 详细安装步骤、常见错误解决方案
+
+### 快速安装（Windows）
+```cmd
+# 1. 运行安装脚本
+install.bat
+
+# 2. 编辑配置文件
+notepad config\config.yaml
 ```
 
-### 2. 配置设置
+### 快速安装（Linux/Mac）
 ```bash
+# 1. 运行安装脚本
+chmod +x install.sh && ./install.sh
+
+# 2. 编辑配置文件
+nano config/config.yaml
+```
+
+### 手动安装
+```bash
+# 安装依赖
+pip install -r requirements.txt
+
 # 复制配置模板
-copy config\config.example.yaml config\config.yaml
-# 编辑配置文件设置SVN、AI、钉钉参数
+copy config\config.example.yaml config\config.yaml  # Windows
+cp config/config.example.yaml config/config.yaml    # Linux/Mac
 ```
 
 ### 3. 运行模式
